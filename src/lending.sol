@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 
-contract MyLend is IERC20, ERC20 {
+contract MyLend is IERC20 {
 
     DreamOracle public oracle;
     mapping(address => mapping(address => uint256)) public deposits; // 예금한 주소, 예금한 토큰, 예금한 값 저장
@@ -31,7 +31,7 @@ contract MyLend is IERC20, ERC20 {
         unlocked = 1;
     }
 
-    constructor(address _token0, address _token1) ERC20("Enong", "ENO"){
+    constructor(address _token0, address _token1) {
         ETH = _token0;
         USDC = _token1;
         time = block.timestamp;
@@ -45,20 +45,10 @@ contract MyLend is IERC20, ERC20 {
         times[tokenAddress] = block.timestamp; // 입금한 시간 저장
     }
 
-    // function calculate(address tokenAddress) internal returns(uint256 _reserve) {
-    //     uint days = (block.timestamp - times[tokenAddress]) / 24;
-    //     for (i=0;i<days;i++){
-    //         _reserve = IERC20(tokenAddress).balanceOf(address(this));
-    //         _reserve = (_reserve * 1001 ^ days) / 1000 ^ days;
-    //     }
-    //     interests[tokenAddress] = _reserve;
-    //     borrows[msg.sender] += _reserve;
-    // }
-
     function borrow(address tokenAddress, uint256 amount) external { //대출. tokenAddress : 담보 토큰. amount : 담보의 양
         require(IERC20(tokenAddress).balaceOf(address(this)) > amount, "Token is under borrow amount"); //pool에 남아 있는 돈 계산
         uint256 mortgage = oracle.getPrice(tokenAddress); //담보 가격 가져오기
-        require(mortgage >= IERC20(USDC).balanceOf(address.this)); // 담보의 가격이 더 세야 함
+        //require(mortgage >= IERC20(USDC).balanceOf(address.this)); // 담보의 가격이 더 세야 함
         uint256 limit = mortgage/2; //50% 비율로 빌려주기
         if (limit > amount){
             borrows[msg.sender][tokenAddress] = amount;
@@ -70,13 +60,19 @@ contract MyLend is IERC20, ERC20 {
 
     function repay(address tokenAddress, uint256 amount) external { //상환
         require(IERC20(tokenAddress).balanceOf(msg.sender) > amount, "msg.sender doesn't have enough amount!");
-        uint days = block.timestamp - time2 / 24; //이자율 계산을 위한 interests
-        borrows[msg.sender][tokenAddress] += (borrows[msg.sender][tokenAddress] * 1001 ^ days) / 1000 ^ days; //이자율 계산해서 총액 더함
+        uint days = block.timestamp - times[tokenAddress] / 24; //이자율 계산을 위한 interests
+        borrows[msg.sender][tokenAddress] += (borrows[msg.sender][tokenAddress] * 1001 ^ days) / (1000 ^ days); //이자율 계산해서 총액 더함 (이자까지 합해서 갚아야 하니까)
         IERC20(tokenAddress).transfer(address(this), amount); // 수수료 합쳐서 청산
+        require(amount < borrows[msg.sender][tokenAddress]);
+        IERC20(USDC).transfer(msg.sender, amount);
         borrows[msg.sender][tokenAddress] -= amount;
-        uint time2 = block.timestamp;
+        times[tokenAddress]=block.timestamp;
     }
 
     function liquidate(address user, address tokenAddress, uint256 amount) external { //청산
+        uint256 mortgage = oracle.getPrice(tokenAddress); //현재 담보 가격 가져오기
+        require(mortagage <= borrows[user][tokenAddress] * 3 / 4, "Liquidation threshold is 75%");
+        burn(msg.sender, borrows[msg.sender][tokenAddress]);
+        borrows[user][tokenAddress] -= amount;
     }
 }
