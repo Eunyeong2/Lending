@@ -82,11 +82,11 @@ contract LendingTest is Test {
         eth.transfer(borrower, 1 ether);
         uint256 balPrev;
         uint256 balAfter;
-        usdc.transfer(borrower,0.005 ether);
+        usdc.transfer(borrower,0.0005 ether);
 
         vm.startPrank(actor);
         vm.warp(0);
-        usdc.approve(address(bank), 1 ether);
+        usdc.approve(address(bank), 10 ether);
         bank.deposit(address(usdc), 1 ether);
         uint256 bal1 = usdc.balanceOf(address(bank)); // 11ether
         bank.give(actor, address(usdc)); // 1ether
@@ -101,9 +101,19 @@ contract LendingTest is Test {
         
         vm.warp(1 days);
 
+        eth.approve(address(bank), 10 ether);
+        usdc.approve(address(bank), 10 ether);
         bank.give2(borrower, address(usdc));
         usdc.balanceOf(borrower);
+        //bank.give2(borrower, address(usdc));
         bank.repay(address(usdc), 0.5005 ether);
+        //bank.give2(borrower, address(usdc));
+        usdc.balanceOf(borrower);
+
+
+        vm.stopPrank();
+        vm.startPrank(actor);
+        
         balPrev = usdc.balanceOf(actor);
         bank.give(actor, address(usdc));
         bank.withdraw(address(usdc), 0.5005 ether);
