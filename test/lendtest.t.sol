@@ -115,7 +115,9 @@ contract LendingTest is Test {
         vm.startPrank(actor);
         
         balPrev = usdc.balanceOf(actor);
-        bank.give(actor, address(usdc));
+        bank.give(actor, address(usdc)); //0
+        bank.print2();
+        bank.print();
         bank.withdraw(address(usdc), 0.5005 ether);
         balAfter = usdc.balanceOf(actor);
         assertEq(balAfter - balPrev, 0.5005 ether);

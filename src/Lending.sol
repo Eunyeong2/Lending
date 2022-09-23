@@ -46,6 +46,14 @@ contract MyLend is IERC20, ERC20 {
         __total = deposits[_who][_token];
     }
 
+    function print() public returns(uint _interests){
+        _interests = total_interests;
+    }
+
+    function print2() public returns(uint _total){
+        _total = total;
+    }
+
     function give2(address _who, address _token) public returns(uint256 ___total){
         ___total = borrows[_who][_token];
     }
@@ -58,11 +66,11 @@ contract MyLend is IERC20, ERC20 {
         if (tokenAddress == USDC){
             deposits[msg.sender][tokenAddress] += amount; //예금 정보 저장 완료
             total_deposits += amount;
+            deposit_address = msg.sender;
         } else{
             mortgages[msg.sender] += amount; //담보 저장
         }
         IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount); // pool에 돈 전달
-        deposit_address = msg.sender;
     }
 
     function borrow(address tokenAddress, uint256 amount) external payable { //대출. tokenAddress : 담보 토큰. amount : 담보의 양
@@ -88,12 +96,13 @@ contract MyLend is IERC20, ERC20 {
         require(tokenAddress == USDC, "Repaying is only USDC");
         require(IERC20(tokenAddress).balanceOf(msg.sender) >= amount, "msg.sender doesn't have enough amount!");
         calculate(tokenAddress, times[msg.sender], block.timestamp); // 이자 갱신
-        IERC20(USDC).transferFrom(msg.sender, tokenAddress, amount); // 수수료 합쳐서 전달
+        IERC20(USDC).transferFrom(msg.sender, address(this), amount); // 수수료 합쳐서 전달
         borrows[msg.sender][tokenAddress] -= amount;
         IERC20(ETH).transfer(msg.sender, amount);
         //transfer(address(USDC), amount);
         times[msg.sender]=block.timestamp;
         //IERC20(USDC).transfer(address(this), amount); // 수수료 정산
+        //total -= amount;
     }
 
     function liquidate(address user, address tokenAddress, uint256 amount) external payable { //청산
@@ -108,31 +117,30 @@ contract MyLend is IERC20, ERC20 {
         if( total_interests == 0){ // 축적된 이자가 없을 때 원금만 돌려줌.
             require(deposits[msg.sender][tokenAddress] >= amount, "Lack of deposit amounts");
             deposits[msg.sender][tokenAddress] -= amount;
+            total_deposits -= amount;
             IERC20(tokenAddress).transfer(msg.sender, amount);
         } else {
-            calculate(tokenAddress,times[msg.sender], block.timestamp);
+            //calculate(tokenAddress,times[msg.sender], block.timestamp);
             require(deposits[msg.sender][tokenAddress] >= amount, "Lack of deposit amounts2");
+            require((deposits[msg.sender][tokenAddress] + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits)) >= amount, "Lack of deposit amounts3");
+            deposits[msg.sender][tokenAddress] += total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
             if(deposits[msg.sender][tokenAddress] > amount){
-                require((deposits[msg.sender][tokenAddress] + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits)) >= amount, "Lack of deposit amounts");
-                deposits[msg.sender][tokenAddress] += total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
                 deposits[msg.sender][tokenAddress] -= amount + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
                 IERC20(tokenAddress).transfer(msg.sender, amount + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits));
+                total_deposits -= amount;
             } else{
                 calculate(tokenAddress,times[msg.sender], block.timestamp);
-                require((deposits[msg.sender][tokenAddress] + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits)) >= amount, "Lack of deposit amounts");
-                deposits[msg.sender][tokenAddress] += total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
                 deposits[msg.sender][tokenAddress] -= amount + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
                 IERC20(tokenAddress).transfer(msg.sender, amount + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits));
+                total_deposits -= amount;
             }
         }
     }
 
     function calculate(address tokenAddress, uint beforetime, uint aftertime) internal lock {
         uint _days =  (aftertime - beforetime) / 1 days;
-        //uint _original = borrows[msg.sender][tokenAddress];
         borrows[msg.sender][tokenAddress] = (borrows[msg.sender][tokenAddress] * (1001 ** _days)) / (1000 ** _days);
         interests[msg.sender][tokenAddress] = (borrows[msg.sender][tokenAddress] * (1001 ** _days)) / (1000 ** _days);
-        //IERC20(tokenAddress).transfer(msg.sender, amount);
-        total_interests = interests[msg.sender][tokenAddress] - total;
+        total_interests += borrows[msg.sender][tokenAddress] - total;
     }
 }
