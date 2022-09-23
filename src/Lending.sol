@@ -9,12 +9,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MyLend is IERC20, ERC20 {
 
-    DreamOracle public oracle;
+    DreamOracle oracle;
     mapping(address => mapping(address => uint256)) public deposits; // 예금한 주소, 예금한 토큰, 예금한 값 저장
     mapping(address => mapping(address => uint256)) public borrows; // 빌린 주소, 빌린 토큰, 빌린 양 저장
     mapping(address => uint256) public times; // block.timestamp
-    //uint time; // 현재 시간
-    address public ETH;
     address public USDC;
 
     uint256 private reserve0;
@@ -31,9 +29,9 @@ contract MyLend is IERC20, ERC20 {
         unlocked = 1;
     }
 
-    constructor(address _token0, address _token1) ERC20("USDC", "USD"){
-        ETH = _token0;
-        USDC = _token1;
+    constructor(address _token0, address _oracle) ERC20("USD", "USDC"){
+        USDC = _token0;
+        oracle = DreamOracle(_oracle);
         time = block.timestamp;
     }
 
@@ -41,7 +39,7 @@ contract MyLend is IERC20, ERC20 {
         require(IERC20(tokenAddress).balanceOf(msg.sender) > amount, "msg.sender doesn't have enough amount!");
         //deposits[msg.sender] = tokenAddress;
         deposits[msg.sender][tokenAddress] = amount; //예금 정보 저장 완료
-        IERC20(tokenAddress).transfer(address(this), amount); // pool에 돈 전달
+        IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount); // pool에 돈 전달
         times[tokenAddress] = block.timestamp; // 입금한 시간 저장
     }
 
