@@ -22,6 +22,8 @@ contract MyLend is IERC20, ERC20 {
     uint256 private total_deposits;
     uint256 private total_interests;
 
+    address private deposit_address;
+
     uint private unlocked = 1;
 
     uint time;
@@ -60,6 +62,7 @@ contract MyLend is IERC20, ERC20 {
             mortgages[msg.sender] += amount; //담보 저장
         }
         IERC20(tokenAddress).transferFrom(msg.sender, address(this), amount); // pool에 돈 전달
+        deposit_address = msg.sender;
     }
 
     function borrow(address tokenAddress, uint256 amount) external payable { //대출. tokenAddress : 담보 토큰. amount : 담보의 양
@@ -82,13 +85,15 @@ contract MyLend is IERC20, ERC20 {
     }
 
     function repay(address tokenAddress, uint256 amount) external payable { //상환
+        require(tokenAddress == USDC, "Repaying is only USDC");
         require(IERC20(tokenAddress).balanceOf(msg.sender) >= amount, "msg.sender doesn't have enough amount!");
         calculate(tokenAddress, times[msg.sender], block.timestamp); // 이자 갱신
-        give2(msg.sender, tokenAddress);
-        IERC20(tokenAddress).transfer(address(this), amount); // 수수료 합쳐서 청산
+        IERC20(USDC).transferFrom(msg.sender, tokenAddress, amount); // 수수료 합쳐서 전달
         borrows[msg.sender][tokenAddress] -= amount;
         IERC20(ETH).transfer(msg.sender, amount);
+        //transfer(address(USDC), amount);
         times[msg.sender]=block.timestamp;
+        //IERC20(USDC).transfer(address(this), amount); // 수수료 정산
     }
 
     function liquidate(address user, address tokenAddress, uint256 amount) external payable { //청산
@@ -105,9 +110,9 @@ contract MyLend is IERC20, ERC20 {
             deposits[msg.sender][tokenAddress] -= amount;
             IERC20(tokenAddress).transfer(msg.sender, amount);
         } else {
+            calculate(tokenAddress,times[msg.sender], block.timestamp);
             require(deposits[msg.sender][tokenAddress] >= amount, "Lack of deposit amounts2");
             if(deposits[msg.sender][tokenAddress] > amount){
-                calculate(tokenAddress,times[msg.sender], block.timestamp);
                 require((deposits[msg.sender][tokenAddress] + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits)) >= amount, "Lack of deposit amounts");
                 deposits[msg.sender][tokenAddress] += total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
                 deposits[msg.sender][tokenAddress] -= amount + total_interests * (deposits[msg.sender][tokenAddress] / total_deposits);
