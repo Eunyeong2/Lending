@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import "../lib/forge-std/src/console.sol";
 import "./DreamOracle.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -95,13 +96,12 @@ contract MyLend is IERC20, ERC20 {
     function repay(address tokenAddress, uint256 amount) external payable { //상환
         require(tokenAddress == USDC, "Repaying is only USDC");
         require(IERC20(tokenAddress).balanceOf(msg.sender) >= amount, "msg.sender doesn't have enough amount!");
-        calculate(tokenAddress, times[msg.sender], block.timestamp); // 이자 갱신
+        uint time_now = times[msg.sender];
+        times[msg.sender]=block.timestamp; // 시간 갱신
+        calculate(tokenAddress, time_now, block.timestamp); // 이자 갱신
         IERC20(USDC).transferFrom(msg.sender, address(this), amount); // 수수료 합쳐서 전달
         borrows[msg.sender][tokenAddress] -= amount;
         IERC20(ETH).transfer(msg.sender, amount);
-        //transfer(address(USDC), amount);
-        times[msg.sender]=block.timestamp;
-        //IERC20(USDC).transfer(address(this), amount); // 수수료 정산
         //total -= amount;
     }
 
@@ -139,8 +139,10 @@ contract MyLend is IERC20, ERC20 {
 
     function calculate(address tokenAddress, uint beforetime, uint aftertime) internal lock {
         uint _days =  (aftertime - beforetime) / 1 days;
-        borrows[msg.sender][tokenAddress] = (borrows[msg.sender][tokenAddress] * (1001 ** _days)) / (1000 ** _days);
-        interests[msg.sender][tokenAddress] = (borrows[msg.sender][tokenAddress] * (1001 ** _days)) / (1000 ** _days);
-        total_interests += borrows[msg.sender][tokenAddress] - total;
+        if (_days != 0){
+            total_interests += borrows[msg.sender][tokenAddress] * (( 1001**_days / 1000**_days) -1);
+            borrows[msg.sender][tokenAddress] = (borrows[msg.sender][tokenAddress] * (1001 ** _days)) / (1000 ** _days);
+            interests[msg.sender][tokenAddress] = borrows[msg.sender][tokenAddress];
+        }
     }
 }
