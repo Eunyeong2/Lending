@@ -188,36 +188,80 @@ function testLendBasic2() public {
     }
 
     function testLiquidateBasic1() public {
-        address actor1 = address(0x11);
-        address actor2 = address(0x22);
-        usdc.transfer(actor1, 10 ether);
-        usdc.transfer(actor2, 10 ether);
-        vm.deal(actor1, 10 ether);
+        address actor = address(0x11);
+        address borrower = address(0x12);
+        usdc.transfer(actor, 10 ether);
+        usdc.transfer(borrower, 1 ether);
+        eth.transfer(borrower, 3 ether);
+        vm.deal(actor, 10 ether);
+        vm.deal(borrower, 1 ether);
         uint256 balPrev;
         uint256 balAfter;
         uint256 etherAmount;
         oracle.setPrice(address(usdc), 2);
 
-        vm.startPrank(actor1);
+        vm.startPrank(actor);
         vm.warp(0);
-        balPrev = usdc.balanceOf(actor1);
-        etherAmount = oracle.getPrice(address(usdc)) * 1 ether * 2;
-        bank.deposit{value: etherAmount}(address(0), 0);
-        bank.borrow(address(usdc), 1 ether);
-        balAfter = usdc.balanceOf(actor1);
-        assertEq(balPrev + 1 ether, balAfter);
-        vm.warp(1 days);
-        vm.stopPrank();
+        balPrev = usdc.balanceOf(actor);
+        etherAmount = oracle.getPrice(address(usdc)) * 1 ether * 2; //4
+        usdc.approve(address(bank), 10 ether);    
+        bank.deposit(address(usdc), etherAmount);
+        uint bal1 = usdc.balanceOf(actor); //10-4 = 6 ether
+        bank.give(actor, address(usdc)); //4 ether
 
-        // lower the price of ETH so that liquidation is triggered
-        oracle.setPrice(address(usdc), 4);
-        vm.startPrank(actor2);
-        balPrev = usdc.balanceOf(actor2);
-        usdc.approve(address(bank), 10 ether);
-        bank.liquidate(actor1, address(usdc), etherAmount);
-        balAfter = usdc.balanceOf(actor2);
-        assertGt(balPrev, balAfter);
         vm.stopPrank();
+        vm.startPrank(borrower);
+
+        uint bal2= usdc.balanceOf(borrower);
+        eth.approve(address(bank), 10 ether);    
+        bank.deposit(address(eth), 3 ether);
+        bank.borrow(address(usdc), 1 ether); // 1 ether 빌림
+        balAfter = usdc.balanceOf(borrower); // 2 ether
+        assertEq(bal2 + 1 ether, balAfter);
+        
+        vm.warp(1 days);
+        
+        balPrev = usdc.balanceOf(borrower);
+        usdc.approve(address(bank), 1.001 ether);
+        bank.repay(address(usdc), 0.5 ether);
+        balAfter = usdc.balanceOf(borrower);
+
+        balPrev = usdc.balanceOf(borrower);
+        bank.repay(address(usdc), 0.501 ether);
+        balAfter = usdc.balanceOf(borrower);
+        oracle.setPrice(address(eth),10 ether);     
+
+
+        // address actor1 = address(0x11);
+        // address actor2 = address(0x22);
+        // usdc.transfer(actor1, 10 ether);
+        // usdc.transfer(actor2, 10 ether);
+        // vm.deal(actor1, 10 ether);
+        // uint256 balPrev;
+        // uint256 balAfter;
+        // uint256 etherAmount;
+        // oracle.setPrice(address(usdc), 2);
+
+        // vm.startPrank(actor1);
+        // vm.warp(0);
+        // balPrev = usdc.balanceOf(actor1);
+        // etherAmount = oracle.getPrice(address(usdc)) * 1 ether * 2;
+        // bank.deposit{value: etherAmount}(address(0), 0);
+        // bank.borrow(address(usdc), 1 ether);
+        // balAfter = usdc.balanceOf(actor1);
+        // assertEq(balPrev + 1 ether, balAfter);
+        // vm.warp(1 days);
+        // vm.stopPrank();
+
+        // // lower the price of ETH so that liquidation is triggered
+        // oracle.setPrice(address(usdc), 4);
+        // vm.startPrank(actor2);
+        // balPrev = usdc.balanceOf(actor2);
+        // usdc.approve(address(bank), 10 ether);
+        // bank.liquidate(actor1, address(usdc), etherAmount);
+        // balAfter = usdc.balanceOf(actor2);
+        // assertGt(balPrev, balAfter);
+        // vm.stopPrank();
     }
 
     function testLiquidateBasic2() public {

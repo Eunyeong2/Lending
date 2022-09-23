@@ -94,7 +94,7 @@ contract MyLend is IERC20, ERC20 {
     }
 
     function repay(address tokenAddress, uint256 amount) external payable { //상환
-        require(tokenAddress == USDC, "Repaying is only USDC");
+        require(tokenAddress == USDC, "Repaying needs only USDC");
         require(IERC20(tokenAddress).balanceOf(msg.sender) >= amount, "msg.sender doesn't have enough amount!");
         uint time_now = times[msg.sender];
         times[msg.sender]=block.timestamp; // 시간 갱신
@@ -106,8 +106,11 @@ contract MyLend is IERC20, ERC20 {
     }
 
     function liquidate(address user, address tokenAddress, uint256 amount) external payable { //청산
-        uint256 mortgage = DreamOracle(oracle).getPrice(tokenAddress); //현재 담보 가격 가져오기
-        require(mortgage <= borrows[user][tokenAddress] * 3 / 4, "Liquidation threshold is 75%");
+        require(tokenAddress == ETH, "Liquidating needs only ETH");
+        uint256 mortgage = DreamOracle(oracle).getPrice(tokenAddress) * mortgages[msg.sender]; //현재 담보 가격 가져오기
+        require(mortgage * 3 / 4 <= borrows[user][tokenAddress], "Liquidation threshold is 75%");
+        //mortgage 가치만큼 
+
         _burn(msg.sender, borrows[msg.sender][tokenAddress]);
         borrows[user][tokenAddress] -= amount;
     }
