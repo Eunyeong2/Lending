@@ -43,25 +43,8 @@ contract MyLend is IERC20, ERC20 {
         oracle = _oracle;
     }
 
-    function give(address _who, address _token) public returns(uint256 __total){
-        __total = deposits[_who][_token];
-    }
-
-    function print() public returns(uint _interests){
-        _interests = total_interests;
-    }
-
-    function print2() public returns(uint _total){
-        _total = total;
-    }
-
-    function give2(address _who, address _token) public returns(uint256 ___total){
-        ___total = borrows[_who][_token];
-    }
-
     function deposit(address tokenAddress, uint256 amount) external payable lock { // 입금
         require(tokenAddress == USDC || tokenAddress == ETH, "tokenAddress is different");
-        //require(msg.value != 0, "msg.value is zero");
         require(IERC20(tokenAddress).balanceOf(msg.sender) >= amount, "msg.sender doesn't have enough amount!");
 
         if (tokenAddress == USDC){
@@ -78,7 +61,7 @@ contract MyLend is IERC20, ERC20 {
         require(IERC20(tokenAddress).balanceOf(address(this)) >= amount, "Token is under borrow amount"); //pool에 남아 있는 돈 계산
         require(tokenAddress == USDC, "You can borrow only USDC");
         
-        uint256 mortgage = DreamOracle(oracle).getPrice(ETH) * mortgages[msg.sender]; //담보 가격 가져오기
+        uint256 mortgage =  mortgages[msg.sender] * DreamOracle(oracle).getPrice(address(ETH));//담보 가격 가져오기
         uint256 limit = mortgage/2; //50% 비율로 빌려주기
 
         if (limit > amount){
@@ -102,21 +85,32 @@ contract MyLend is IERC20, ERC20 {
         IERC20(USDC).transferFrom(msg.sender, address(this), amount); // 수수료 합쳐서 전달
         borrows[msg.sender][tokenAddress] -= amount;
         IERC20(ETH).transfer(msg.sender, amount);
-        //total -= amount;
+        mortgages[msg.sender] -= amount;
     }
 
     function liquidate(address user, address tokenAddress, uint256 amount) external payable { //청산
-        require(tokenAddress == ETH, "Liquidating needs only ETH");
-        uint256 mortgage = DreamOracle(oracle).getPrice(tokenAddress) * mortgages[msg.sender]; //현재 담보 가격 가져오기
+        require(tokenAddress == USDC, "liquidate: token error");
+        console.log(mortgages[msg.sender]);
+        uint256 mortgage = DreamOracle(oracle).getPrice(ETH) * (mortgages[msg.sender])/10**18; //현재 담보 가격 가져오기
+        console.log(mortgage);
+        console.log(borrows[user][tokenAddress]);
         require(mortgage * 3 / 4 <= borrows[user][tokenAddress], "Liquidation threshold is 75%");
-        //mortgage 가치만큼 
 
-        _burn(msg.sender, borrows[msg.sender][tokenAddress]);
+        uint256 price = DreamOracle(oracle).getPrice(tokenAddress) * amount; // 청산 가격
+
+        if(borrows[msg.sender][address(USDC)] < price){
+            borrows[msg.sender][address(USDC)] = 0;
+            IERC20(USDC).transfer(address(this), price);
+        } else{
+            borrows[msg.sender][address(USDC)] -= price;
+            IERC20(USDC).transfer(address(this), price);
+        }
+
         borrows[user][tokenAddress] -= amount;
     }
 
     function withdraw(address tokenAddress, uint256 amount) external payable{
-        //require(deposits[msg.sender][tokenAddress] >= amount);
+        require(deposits[msg.sender][tokenAddress] >= amount);
         if( total_interests == 0){ // 축적된 이자가 없을 때 원금만 돌려줌.
             require(deposits[msg.sender][tokenAddress] >= amount, "Lack of deposit amounts");
             deposits[msg.sender][tokenAddress] -= amount;
