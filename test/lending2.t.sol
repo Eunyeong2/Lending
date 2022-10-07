@@ -116,9 +116,14 @@ contract Lending_test is Test
         dreamoracle.setPrice(address(usdc), 1.5 ether);
 
         vm.startPrank(alice);
+        usdc.approve(address(lending), 150 ether);
+        console.log("before eth: ", alice.balance);
+        console.log("before usdc: ", usdc.balanceOf(alice));
+        console.log("before bob's usdc: ", usdc.balanceOf(bob));
         lending.liquidate(bob, address(usdc), 90 ether);
         console.log("alice's eth: ", alice.balance);
         console.log("alice's usdc: ", usdc.balanceOf(alice));
+        console.log("bob's usdc: ", usdc.balanceOf(bob));
     }
 
     function testfee() public

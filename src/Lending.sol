@@ -105,18 +105,16 @@ contract MyLend is ERC20{
         require(borrowers[user].borrowAmount >= amount);
 
         uint256 limit = borrowers[user].orimortgages * DreamOracle(oracle).getPrice(address(0)) * 3 / 10**18 /4;
-        console.log("limit: ", limit);
 
         require(borrowers[user].borrowAmount * DreamOracle(oracle).getPrice(address(tokenAddress)) / 10**18 >= limit, "threshold");
-        console.log(borrowers[user].borrowAmount * DreamOracle(oracle).getPrice(address(tokenAddress)) / 10**18);
-        //uint256 mortgageAmount = amount * 10**18 * 2 * DreamOracle(oracle).getPrice(address(tokenAddress))/DreamOracle(oracle).getPrice(address(0));
         uint256 mortgageAmount = amount / (DreamOracle(oracle).getPrice(address(0)) / 1 ether);
-        //mortgageAmount += mortgageAmount / 1000 * 5;
+        mortgageAmount += mortgageAmount / 1000 * 5;
 
         require( borrowers[user].orimortgages >= mortgageAmount );
         borrowers[user].orimortgages -= mortgageAmount;
 
-        ERC20(tokenAddress).transferFrom(msg.sender, address(this), amount);
+        require(ERC20(tokenAddress).transferFrom(msg.sender, address(this), amount));
+        borrowers[user].borrowAmount -= amount;
         payable(msg.sender).transfer(mortgageAmount);
     }
 
